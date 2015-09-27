@@ -1,0 +1,365 @@
+---
+title: "lecture23-caret packages"
+author: "Sejin Park"
+date: "2015. 9. 25."
+output: html_document
+---
+
+
+data의 
+```{r}
+library(caret); library(kernlab); data(spam)
+# spam 데이터를 살펴보자. 
+head(spam)
+names(spam)
+levels(spam$type)
+# spam의 type을 75% 선택해서 suffle하여 resampling한다. 
+inTrain <- createDataPartition(y=spam$type, p=0.75, list=FALSE)
+training <- spam[inTrain,]
+testing <- spam[-inTrain,]
+dim(training)
+```
+
+## Data splicing
+```{r}
+library(caret);library(kernlab);data(spam)
+inTrain <- createDataPartition(y=spam$type,p=0.75, list=FALSE)
+training <- spam[inTrain,]
+testing <- spam[-inTrain,]
+dim(training)
+
+set.seed(32343)
+# training데이터의 type(spam, nonspam)를 모든 변수에 대하여 glm으로 모델링 한다.  
+modelFit <- train(type ~. , data=training, method="glm")
+modelFit
+modelFit$finalModel
+```
+
+## SPAM Example : K-fold
+k=10으로 하면, 데이터 갯수가 `r length(spam$type)`와 같을 때, 
+'r length(spam$type)/(k=10)'만큼의 test set이 만들어지고, 
+`r  9*length(spam$type)/(k=10)` 만큼의 training set이 만들어진다.  
+k등분한 데이터 중 하나가 test set이 되어 각각 다른 k번의 수행으로 나온 k개의 정확도를 평균한다.
+- If list if false, returns a vector of fold number
+- returnTrain refers to whether to return training or testing set
+```{r}
+set.seed(32323)
+# k-fold (k=10) : 데이터를 k(=10)등분 한 후, 1/k 을 test데이터로 9/k를 train 데이터로 생성한다. 
+folds <- createFolds(y=spam$type, k=10, list=TRUE, returnTrain=TRUE)
+sapply(folds, length)
+# k개의 training samples set
+folds[[1]][1:10]
+```
+
+위와 같이 `returnTrain=TRUE`라고 하면 training set을 만들어주고, 
+다음과 같이 `returnTrain=FALSE`라고 하면 test set을 만들어준다. 
+## SPAM Example : Return test
+
+```{r}
+set.seed(32323)
+folds <- createFolds(y=spam$type, k=10, list=TRUE, returnTrain=FALSE)
+sapply(folds, length)
+folds[[1]][1:10]
+```
+
+## SPAM Example : Resampling  
+
+`times=10`을 하면, 10번 resampling한 값들을 돌려준다.  
+
+```{r}
+set.seed(32323)
+folds <- createResample(y=spam$type, times=10, list=TRUE)
+sapply(folds, length)
+folds[[1]][1:10]
+```
+
+## SPAM Example : Time Slices
+
+시계열 데이터를 slice할 때는 
+```{r}
+set.seed(32323)
+tme <- 1:1000
+# initialWindow : training set, horizon : testset 
+folds <- createTimeSlices(y=tme, initialWindow = 20, horizon=10)
+names(folds)
+```
+
+Stackoverflow 의 suggestion
+
+```{r}
+library(caret)
+library(ggplot2)
+data(economics)
+myTimeControl <- trainControl(method = "timeslice",
+                              initialWindow = 36,
+                              horizon = 12,
+                              fixedWindow = TRUE)
+
+plsFitTime <- train(unemploy ~ pce + pop + psavert,
+                    data = economics,
+                    method = "pls",
+                    preProc = c("center", "scale"),
+                    trControl = myTimeControl)
+```
+
+## SPAM Example
+```{r}
+library(caret);library(kernlab);data(spam)
+inTrain <- createDataPartition(y=spam$type,
+                               p=0.75, list=FALSE)
+training <- spam[inTrain,]
+testing <- spam[-inTrain,]
+modelFit <- train(type ~. , data=training, method="glm")
+```
+
+## Train options
+```{r}
+args(train.default)
+```
+
+```{r}
+args(trainControl)
+```
+
+
+
+```{r}
+set.seed(1235)
+modelFit2 <- train(type~., data=training, method="glm")
+modelFit2
+
+set.seed(1235)
+modelFit3 <- train(type~., data=training, method="glm")
+modelFit3
+
+
+```
+
+## Plotting predictor
+
+```{r}
+library(ISLR); library(ggplot2); library(caret); 
+data(Wage)
+summary(Wage)
+
+inTrain <- createDataPartition(y=Wage$wage, p=0.7, list=FALSE)
+training <- Wage[inTrain,]
+testing <- Wage[-inTrain,]
+dim(training); dim(testing)
+
+```
+
+## Feature plot (caret package)
+```{r}
+featurePlot(x = training[,c("age", "education", "jobclass")], 
+            y = training$wage,
+            plot="pairs")
+# Qplot (ggplot2 package)
+qplot(age, wage, data=training)
+# Qplot with color(ggplot2 package)
+qplot(age, wage,color=jobclass, data=training)
+# Add regression smoothers (ggplot2 package)
+qq <- qplot(age, wage, colour=education, data=training)
+qq + geom_smooth(method="lm", formula=y~x)
+```
+
+## cut2, making factors (Hmisc Package)
+```{r}
+library("Hmisc")
+library("gridExtra")
+# continuouts value를 factor로 변환한다.  g개의 그룹으로 자름
+cutWage <- cut2(training$wage, g=3)
+table(cutWage)
+# boxplots with cut2
+p1 <- qplot(cutWage, age, data=training, fill=cutWage, geom=c("boxplot"))
+p1
+# Boxplots with points overlayed
+p2 <- qplot(cutWage, age, data=training, fill=cutWage, geom=c("boxplot", "jitter"))
+# plot the two graphs side by side 
+grid.arrange(p1,p2,ncol=2)
+```
+
+cutWage와 jobclass variables로 테이블을 만든다. 
+```{r}
+# Tables
+t1 <- table(cutWage, training$jobclass)
+t1
+# 행을 기준으로 proportion table로 변환한다. 
+prop.table(t1,1)
+# Density plots
+qplot(wage, colour=education, data=training, geom="density")
+```
+
+## Why proprocess?
+```{r}
+library(caret); library(kernlab); data(spam)
+inTrain <- createDataPartition(y = spam$type, p = 0.75, list=FALSE)
+training <- spam[inTrain,]
+testing <- spam[-inTrain,]
+hist(training$capitalAve, main="", xlab="ave. capital run length")
+```
+very skewed 
+
+## Standardizing
+```{r}
+trainCapAve <- training$capitalAve
+trainCapAveS <- (trainCapAve - mean(trainCapAve))/sd(trainCapAve)
+mean(trainCapAveS)
+sd(trainCapAveS)
+```
+
+## Standardizing - test set
+```{r}
+testCapAve <- testing$capitalAve
+testCapAveS <- (testCapAve - mean(trainCapAve))/sd(trainCapAveS)
+mean(testCapAveS) 
+```
+
+## Standardizing - preProcessfunction
+```{r}
+preObj <- preProcess(training[, -58], method=c("center", "scale")) 
+trainCapAveS <- predict(preObj, testing[,-58])$capitalAve
+mean(trainCapAveS)
+sd(testCapAveS)
+```
+
+## Standardizing - preProcess argument
+```{r}
+preObj <- preProcess(training[, -58], method=c("BoxCox"))
+trainCapAveS <- predict(preObj, training[,-58])$capitalAve
+par(mfrow=c(1,2)); hist(trainCapAveS); qqnorm(trainCapAveS)
+```
+
+## Standardizing - Box-cox transforms 
+```{r}
+# set up BoxCox trainsforms
+preObj <- preProcess(training[,-58], method=c("BoxCox"))
+# perform preprocessing on training data
+trainCapAveS <- predict(preObj, training[,-58])$capitalAve
+# plot histogram and QQ Plot
+# Note : the transforamation definitely helped to
+# normalize the data but it does not produce perfect result
+par(mfrow=c(1,2)); hist(trainCapAveS); qqnorm(trainCapAveS)
+```
+
+## Standardizing - Imputing data
+```{r}
+set.seed(13343)
+#Make some values NA
+training$capAve <- training$capitalAve
+selectNA <- rbinom(dim(training)[1], size=1, prob=0.5)==1
+training$capAve[selectNA] <- NA
+
+# Impute and standardize
+preObj <- preProcess(training[, -58], method="knnImpute")
+capAve <- predict(preObj, training[,-58])$capAve
+
+
+# Standardize true value
+capAveTruth <- training$capitalAve
+capAveTruth <- (capAveTruth - mean(capAveTruth))/sd(capAveTruth)
+
+# Stardardizing - Imputing data
+set.seed(13343)
+# Make some values NA
+training$capAve <- training$capitalAve
+selectNA <- rbinom(dim(training)[1], size=1, prob=0.05)==1
+training$capAve[selectNA] <- NA
+
+# Impute and standardize
+preObj <- preProcess(training[,-58], method = "knnImpute")
+capAve <- predict(preObj, training[,-58])$capAve
+
+# Standardize true values 
+capAveTruth <- training$capitalAve
+capAveTruth <- (capAveTruth-mean(capAveTruth))/sd(capAveTruth)
+
+# Standardizing - Imputing data 
+quantile(capAve - capAveTruth)
+quantile((capAve-capAveTruth)[selectNA])
+quantile((capAve - capAveTruth)[!selectNA])
+```
+
+## Covariate
+
+* Level1, Raw data -> covariates  
+
+summarization vs information loss  
+
+- Text files : Frequency of words, frequency of phrases (Google ngrams), frequency of capital letters.
+- Images : Edges, corners, blobs, ridges (computer visin feature detection)
+- Webpages : Number and type of images, position of elements, color, videos (A/B Testing)
+- People : Height, weight, hair color, sex, country of origin.  
+
+```{r}
+library(kernlab); data(spam)
+spam$capitalAveSq <- spam$capitalAve^2
+```
+
+## Level2, Tidy covariates -> new covariates 
+
+* More necessary for some methods (regression, svms) than for otehrs(classification trees)
+* Should be done only on the training set
+* The best approach is through exploratory analysis(plotting/tables)
+* New covariates should be added to data frames
+
+## Load example data
+```{r}
+library(ISLR); library(caret); data(Wage);
+inTrain <- createDataPartition(y=Wage$wage, p=0.7, list=FALSE)
+training <- Wage[inTrain,]; testing <- Wage[-inTrain,]
+```
+ 
+## Common covariates to add , dummy variables
+
+Basic idea - convert factor variables to indicator variables
+```{r}
+table(training$jobclass)
+dummies <- dummyVars(wage ~ jobclass, data=training)
+head(predict(dummies, newdata=training))
+```
+## Removing zero covariates
+
+```{r}
+nsv <- nearZeroVar(training, saveMetrics = TRUE)
+nsv
+```
+
+## Spline basis  
+```{r}
+library(splines)
+bsBasis <- bs(training$age, df=3)
+bsBasis
+```
+
+## Fitting curves with splines
+
+```{r}
+lm1 <- lm(wage ~ bsBasis, data=training)
+plot(training$age, training$wage, pch=19, cex=0.5)
+points(training$age, predict(lm1, newdata=training), col="red", pch=19, cex=0.5)
+```
+
+## Splines on the test set
+```{r}
+predict(bsBasis, age=testing$age)
+```
+
+## Notes and further reading
+
+
+* Level 1 feature creation (raw data to covariates)
+- Science is key. Google "feature extraction for [data type]"
+- Err on overcreation of features
+- In some applications (images, voices) automated feature creation is possible/necessary
+http://www.cs.nyu.edu/~yann/talks/lecun-ranzato-icml2013.pdf
+
+* Level 2 feature creation (covariates to new covariates)
+- The function preProcess in caret will handle some preprocessing.
+- Create new covariates if you think they will improve fit
+- Use exploratory analysis on the training set for creating them
+- Be careful about overfitting!
+
+* preprocessing with caret
+* If you want to fit spline models, use the gam method in the caret package which allows smoothing of multiple variables.
+* More on feature creation/data tidying in the Obtaining Data course from the Data Science course track.
