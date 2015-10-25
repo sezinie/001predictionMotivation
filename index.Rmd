@@ -1,7 +1,7 @@
 ---
 title: "Cousera JH - Prediction Motivation"
 author: "Sejin Park"
-date: "2015. 9. 14."
+date: "2015. 10. 25."
 output:
   html_document:
     keep_md: yes
