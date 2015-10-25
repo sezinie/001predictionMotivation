@@ -7,21 +7,78 @@ output:
     keep_md: yes
 ---
 
-The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases. 
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did.
+
+You will also use your prediction model to predict 20 different test cases.
 
 1. Your submission should consist of a link to a Github repo with your R markdown and compiled HTML file describing your analysis. Please constrain the text of the writeup to < 2000 words and the number of figures to be less than 5. It will make it easier for the graders if you submit a repo with a gh-pages branch so the HTML page can be viewed online (and you always want to make it easy on graders :-).
-2. You should also apply your machine learning algorithm to the 20 test cases available in the test data above. Please submit your predictions in appropriate format to the programming assignment for automated grading. See the programming assignment for additional details. 
+2. You should also apply your machine learning algorithm to the 20 test cases available in the test data above. Please submit your predictions in appropriate format to the programming assignment for automated grading. See the programming assignment for additional details.
 
+
+## Data Download and Load
 
 ```{r}
+library(caret)
+#fileURL.tr <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+#fileURL.test <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+#download.file(fileURL.tr, "pml-training.csv")
+#download.file(fileURL.test, "pml-testing.csv")
 
-fileURL.tr <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
-fileURL.test <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
-download.file(fileURL.tr, "pml-training.csv")
-download.file(fileURL.test, "pml-testing.csv")
-
-pml.training <- read.csv("pml-training.csv", header=T,stringsAsFactors = F)
+pml.training <- read.csv("pml-training.csv",header=T, stringsAsFactors=FALSE,na.strings= c("NA",""," ","#DIV/0!"))
 str(pml.training)
-pml.testing <-  read.csv("pml-testing.csv", header=T,stringsAsFactors = F)
+pml.training$classe <- factor(pml.training$classe)
+str(pml.training)
+pml.testing <- read.csv("pml-testing.csv",header=T, stringsAsFactors=FALSE,na.strings= c("NA",""," ","#DIV/0!"))
+str(pml.testing)
 ```
 
+
+## Preprocessing
+Data cleaning
+```{r}
+names.complete <- names(pml.training)[colSums(is.na(pml.training))==0]
+pml.training.cleaning <- pml.training[names.complete][-c(1:7)]
+names(pml.training.cleaning)
+
+names.complete <- names(pml.testing)[colSums(is.na(pml.testing))==0]
+pml.testing.cleaning <- pml.testing[names.complete][-c(1:7)]
+```
+
+
+## Training
+
+training algorithm : random forest 
+out of sample error to be and estimate the error appropriately with cross-validation
+```{r}
+set.seed(777)
+fit.model <- train(classe ~ ., data=pml.training.cleaning,
+                  method = "rf",
+                  trControl = trainControl(method = "cv", number=5),
+                  preProc = c("center", "scale"))
+
+print(fit.model)
+```
+
+## estimate of  error rate
+```{r}
+# estimate of  error rate
+print(fit.model$finalModel)
+```
+
+
+## Test data
+apply my machine learning algorithm to the 20 test cases available in the test data
+
+```{r}
+predict.testset <- predict(fit.model,pml.testing.cleaning )
+predict.testset
+```
+
+
+## Reference
+
+* The data for this project come from this source: <http://groupware.les.inf.puc-rio.br/har>
+
+* Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013.
+
+* Read more: http://groupware.les.inf.puc-rio.br/har#literature#ixzz3nAyNhct6
